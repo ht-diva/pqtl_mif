@@ -54,3 +54,13 @@ res_cs_snps <- get_fine_mapping(
 
 
 res_cs_snps %>% dplyr::filter(variantId %in% mif_snps)
+
+# find positions of cs variants in build 37
+cs_snps_b37 <- map_dfr(
+  res_cs_snps$variantId, 
+  function(snp) get_variant(variantId = snp, .return_raw = FALSE)
+  ) %>%
+  dplyr::mutate(
+    chr_pos_b37 = str_remove(b37VariantId, "_b37") %>% str_replace_all("_", ":")
+    )
+

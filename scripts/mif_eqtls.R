@@ -8,6 +8,7 @@ path_query <- "/scratch/dariush.ghasemi/projects/pqtl_mif/results/12-Aug-25_summ
 tbl_region_query <- "/scratch/dariush.ghasemi/projects/pqtl_mif/results/22-Aug-25_region_eqtls_interrogation_gtex_v10.csv"
 scatter_eqtls <- "13-Aug-25_query_of_mif_in_gtex_v10.png"
 scatter_pdf <- "23-Aug-25_query_of_mif_in_gtex_v10.pdf"
+heatmap_eqtls <- "05-Sep-25_query_of_mif_proxies_in_gtex_v8.png"
 
 #--------------------------------# 
 # the largest locus in MIF region 
@@ -19,43 +20,59 @@ scatter_pdf <- "23-Aug-25_query_of_mif_in_gtex_v10.pdf"
 #  DDT: 23971370..23980504 <-> 24313559..24322695
 #--------------------------------# 
 
-# index and conditional variants at 5 MIF loci
-mif_snps <- c(
-  "chr22_23924644_C_G_b38",
-  "chr22_23924680_A_G_b38",
-  "chr22_23992755_A_C_b38",
-  "chr22_23998746_A_G_b38",
-  "chr22_24225573_A_G_b38",
-  "chr22_23995877_G_T_b38",
-  "chr22_23970015_A_G_b38",
-  "chr22_24235780_C_T_b38",
-  "chr22_24247481_C_G_b38",
-  "chr22_24499755_A_G_b38"
-)
-#--------------------------------# 
-
 # Can be a GTEx specific ID (e.g. "Whole_Blood") 
 # to see valid values or an Ontology ID
 get_tissue_site_detail()
 
 # query region in GTEx
-res_query <- get_significant_single_tissue_eqtls_by_location(
+res_query_v8 <- get_significant_single_tissue_eqtls_by_location(
   tissueSiteDetailId = "Liver",
   start = 23599881,
   end = 25732482,
   chromosome = "chr22",
-  datasetId = "gtex_v10",
+  datasetId = "gtex_v8",
   .return_raw = FALSE
 )
 
+annot_eqtl <- data.frame(
+         snpId = c("rs5760119", "rs5760120", "rs6004011", "rs4822466"),
+         locus = c("MIF index", "MIF index", "GSTT1 conditional", "DDT conditional")
+         )
 
-res_query %>%
-  dplyr::filter(
-    #variantId %in% mif_snps
-    ) %>%
+#--------------------------------#
+# Visualize query results for mif index/cojo snps
+res_query_v8 %>%
   dplyr::select(
     chromosome, pos, snpId, tissueSiteDetailId, geneSymbol, nes, pValue
-  ) %>% count(geneSymbol) %>% print(n=Inf)
+  ) %>%
+  left_join(annot_eqtl, join_by(snpId)) %>%
+  #count(geneSymbol) %>% print(n=Inf)
+  mutate(
+    chr_pos = str_c(chromosome, ":", pos),
+    my_snp  = paste0(snpId, ", ", locus),
+    my_snp  = str_remove(my_snp, ", NA"),
+    snp_annot = fct_reorder(my_snp, pos)
+    ) %>%
+  dplyr::filter(
+    chr_pos %in% proxies_liftover$pos_hg38, # of 39 proxies, v8 had 34 eQTLs; v10 had 35.
+    pValue < 5e-8
+    ) %>%
+  ggplot(aes(geneSymbol, snp_annot, fill = nes)) +
+  geom_tile(color = "grey30") +
+  scale_y_discrete(position = "right")+
+  scale_fill_gradient2(low = "#075AFF",
+                       mid = "#FFFFCC",
+                       high = "#FF0000")+ #coord_fixed()
+  guides(fill = guide_colourbar(position = "bottom", title = "Normalized\neffect size"))+
+  theme_bw()+
+  theme(
+    axis.title = element_blank(),
+    axis.text.x = element_text(size = 12, face = 3)
+  )
+
+# save heatmap
+ggsave(filename = heatmap_eqtls, height = 7.5, width = 13, dpi = 150)
+
 
 #--------------------------------#
 # QC query results
